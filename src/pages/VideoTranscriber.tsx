@@ -1,22 +1,14 @@
 import { useState } from 'react';
 import { ArrowLeft, Copy, Check, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
 import ExistingVideoSelector from '../components/ExistingVideoSelector';
-
-interface TranscriptionOptions {
-  language?: string;
-  response_format?: 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
-  temperature?: number;
-  timestamp_granularities?: ('segment' | 'word')[];
-}
 
 export default function VideoTranscriber() {
   const [transcription, setTranscription] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
-  const [options, setOptions] = useState<TranscriptionOptions>({
+  const [options, setOptions] = useState({
     response_format: 'text',
     timestamp_granularities: ['segment'],
   });
@@ -31,7 +23,7 @@ export default function VideoTranscriber() {
     setTranscription('');
 
     try {
-      const response = await fetch('/api/transcribe', {
+      const response = await fetch('/.netlify/functions/transcribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -43,14 +35,15 @@ export default function VideoTranscriber() {
       });
 
       if (!response.ok) {
-        throw new Error('Transcription failed');
+        const error = await response.json();
+        throw new Error(error.error || 'Transcription failed');
       }
 
       const data = await response.json();
       setTranscription(data.text);
     } catch (error) {
       console.error('Error:', error);
-      alert('Failed to transcribe video. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to transcribe video. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -83,7 +76,6 @@ export default function VideoTranscriber() {
           />
         </div>
 
-        {/* Options Section */}
         <div className="bg-gray-800 rounded-xl p-6 mb-8">
           <h3 className="text-lg font-[500] mb-4">Transcription Options</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -95,7 +87,7 @@ export default function VideoTranscriber() {
                 value={options.response_format}
                 onChange={(e) => setOptions({
                   ...options,
-                  response_format: e.target.value as TranscriptionOptions['response_format']
+                  response_format: e.target.value as any
                 })}
                 className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
               >
@@ -110,7 +102,7 @@ export default function VideoTranscriber() {
                 Timestamp Granularity
               </label>
               <select
-                value={options.timestamp_granularities?.[0]}
+                value={options.timestamp_granularities[0]}
                 onChange={(e) => setOptions({
                   ...options,
                   timestamp_granularities: [e.target.value as 'segment' | 'word']
@@ -139,7 +131,6 @@ export default function VideoTranscriber() {
           </button>
         </div>
 
-        {/* Transcription Result */}
         {transcription && (
           <div className="bg-gray-800 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
