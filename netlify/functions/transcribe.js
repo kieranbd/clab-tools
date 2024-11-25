@@ -1,31 +1,22 @@
 import { OpenAI } from 'openai';
 import fetch from 'node-fetch';
-import { Readable } from 'stream';
+import FormData from 'form-data';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// Convert buffer to stream
-function bufferToStream(buffer) {
-  return new Readable({
-    read() {
-      this.push(buffer);
-      this.push(null);
-    }
-  });
-}
-
 export const handler = async (event) => {
-  // Enable CORS
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      }
+      headers
     };
   }
 
@@ -33,7 +24,7 @@ export const handler = async (event) => {
     return { 
       statusCode: 405, 
       body: JSON.stringify({ error: 'Method Not Allowed' }),
-      headers: { 'Access-Control-Allow-Origin': '*' }
+      headers
     };
   }
 
@@ -44,7 +35,7 @@ export const handler = async (event) => {
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'Video URL is required' }),
-        headers: { 'Access-Control-Allow-Origin': '*' }
+        headers
       };
     }
 
@@ -54,19 +45,28 @@ export const handler = async (event) => {
       throw new Error('Failed to fetch video file');
     }
 
-    const buffer = await response.arrayBuffer();
-    const stream = bufferToStream(Buffer.from(buffer));
+    const buffer = await response.buffer();
 
-    // Create a file object that OpenAI can process
-    const file = {
-      stream: () => stream,
-      name: 'video.mp4',
-      type: 'video/mp4'
-    };
+    // Create form data
+    const formData = new FormData();
+    formData.append('file', buffer, {
+      filename: 'audio.mp4',
+      contentType: 'video/mp4'
+    });
+    formData.append('model', 'whisper-1');
 
-    // Transcribe using OpenAI
+    // Add options to form data
+    if (options) {
+      Object.entries(options).forEach(([key, value]) => {
+        if (value !== undefined) {
+          formData.append(key, value);
+        }
+      });
+    }
+
+    // Make direct request to OpenAI API
     const transcription = await openai.audio.transcriptions.create({
-      file,
+      file: buffer,
       model: 'whisper-1',
       ...options
     });
@@ -74,14 +74,16 @@ export const handler = async (event) => {
     return {
       statusCode: 200,
       body: JSON.stringify(transcription),
-      headers: { 'Access-Control-Allow-Origin': '*' }
+      headers
     };
   } catch (error) {
     console.error('Transcription error:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to transcribe video: ' + error.message }),
-      headers: { 'Access-Control-Allow-Origin': '*' }
+      body: JSON.stringify({ 
+        error: 'Failed to transcribe video: ' + error.message 
+      }),
+      headers
     };
   }
 };

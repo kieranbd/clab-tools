@@ -10,7 +10,7 @@ export default function VideoTranscriber() {
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [options, setOptions] = useState({
     response_format: 'text',
-    timestamp_granularities: ['segment'],
+    timestamp_granularities: ['segment']
   });
 
   const handleExistingVideoSelect = (url: string) => {
