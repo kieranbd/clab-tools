@@ -1,9 +1,20 @@
 import { OpenAI } from 'openai';
 import fetch from 'node-fetch';
+import { Readable } from 'stream';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
+
+// Convert buffer to stream
+function bufferToStream(buffer) {
+  return new Readable({
+    read() {
+      this.push(buffer);
+      this.push(null);
+    }
+  });
+}
 
 export const handler = async (event) => {
   // Enable CORS
@@ -44,7 +55,14 @@ export const handler = async (event) => {
     }
 
     const buffer = await response.arrayBuffer();
-    const file = new Blob([buffer], { type: 'video/mp4' });
+    const stream = bufferToStream(Buffer.from(buffer));
+
+    // Create a file object that OpenAI can process
+    const file = {
+      stream: () => stream,
+      name: 'video.mp4',
+      type: 'video/mp4'
+    };
 
     // Transcribe using OpenAI
     const transcription = await openai.audio.transcriptions.create({
